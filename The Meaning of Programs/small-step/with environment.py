@@ -8,6 +8,44 @@ class Number:
         return f"{self.value}"
 
 
+class Boolean:
+    reducible = False
+
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return f"{self.value}"
+
+    def __eq__(self, other):
+        if not isinstance(other, Boolean):
+            return False
+        return self.value == other.value
+
+
+class Varible:
+    reducible = True
+
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return f"{self.name}"
+
+    def reduce(self, environment):
+        return environment.get(self.name)
+
+
+class DoNothing:
+    reducible = False
+
+    def __repr__(self):
+        return 'do-nothing'
+
+    def __eq__(self, other):
+        return isinstance(other, DoNothing)
+
+
 class Add:
     reducible = True
 
@@ -50,21 +88,6 @@ class Multiply:
             return Number(self.left.value * self.right.value)
 
 
-class Boolean:
-    reducible = False
-
-    def __init__(self, value):
-        self.value = value
-
-    def __repr__(self):
-        return f"{self.value}"
-
-    def __eq__(self, other):
-        if not isinstance(other, Boolean):
-            return False
-        return self.value == other.value
-
-
 class LessThan:
     reducible = True
 
@@ -84,29 +107,6 @@ class LessThan:
                             self.right.reduce(environment))
         else:
             return Boolean(self.left.value < self.right.value)
-
-
-class Varible:
-    reducible = True
-
-    def __init__(self, name):
-        self.name = name
-
-    def __repr__(self):
-        return f"{self.name}"
-
-    def reduce(self, environment):
-        return environment.get(self.name)
-
-
-class DoNothing:
-    reducible = False
-
-    def __eq__(self, other):
-        return isinstance(other, DoNothing)
-
-    def __repr__(self):
-        return 'do-nothing'
 
 
 class Assign:
@@ -209,6 +209,7 @@ if __name__ == '__main__':
     res = Machine(exp, exp_env).run()
     print('exp:', exp, 'res:', res)
 
+    # assign
     assign_exp = Assign(Varible('x'),
                         Add(Varible('x'), Number(1)))
     assign_exp_env = {
@@ -217,6 +218,7 @@ if __name__ == '__main__':
     assign_res = Machine(assign_exp, assign_exp_env).run()
     print('exp:', assign_exp, 'res:', assign_res)
 
+    # if
     if_exp = If(Varible('x'),
                 Assign('y', Number(1)),
                 Assign('y', Number(2)))
@@ -226,6 +228,7 @@ if __name__ == '__main__':
     if_res = Machine(if_exp, if_exp_env).run()
     print('exp:', if_exp, 'res:', if_res)
 
+    # if
     if_exp_1 = If(Varible('x'),
                   Assign('y', Number(1)),
                   DoNothing())
@@ -235,12 +238,14 @@ if __name__ == '__main__':
     if_res_1 = Machine(if_exp_1, if_exp_1_env).run()
     print('exp:', if_exp_1, 'res:', if_res_1)
 
+    # sequence
     sequence_exp = Sequence(Assign('x', Add(Number(1), Number(1))),
                             Assign('y', Add(Varible('x'), Number(3))))
     sequence_exp_env = {}
     sequence_res = Machine(sequence_exp, sequence_exp_env).run()
     print('exp:', sequence_exp, 'res:', sequence_res)
 
+    # while
     while_exp = While(LessThan(Varible('x'), Number(5)),
                       Assign('x', Multiply(Varible('x'), Number(3))))
     while_exp_env = {
