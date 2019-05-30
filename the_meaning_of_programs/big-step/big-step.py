@@ -40,9 +40,6 @@ class DoNothing:
     def __repr__(self):
         return 'do-nothing'
 
-    def __eq__(self, other):
-        return isinstance(other, DoNothing)
-
     def evaluate(self, environment):
         return environment
 
