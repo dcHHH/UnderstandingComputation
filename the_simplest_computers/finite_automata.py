@@ -69,53 +69,60 @@ class NFARulebook:
     def __init__(self, rules):
         self.rules = rules
 
-    def next_states(self, states, character):
+    def __repr__(self):
+        return f"{self.rules}"
+
+    def next_states(self, states: set, character):
         return set(chain(*[self.follow_rules_for(state, character) for state in states]))
 
-    def follow_rules_for(self, state, character):
+    def follow_rules_for(self, state: set, character):
         return [rule.follow() for rule in self.rules_for(state, character)]
 
-    def rules_for(self, state, character):
+    def rules_for(self, state: set, character):
         return [rule for rule in self.rules if rule.applies_to(state, character)]
 
-    def follow_free_moves(self, states):
+    def follow_free_moves(self, states: set):
         move_states = self.next_states(states, None)
         if move_states.issubset(states):
             return states
         else:
-            return self.follow_free_moves(states.union(move_states))
+            return self.follow_free_moves(states | move_states)
 
 
 class NFA:
-    def __init__(self, current_states, accept_states, rulebook):
-        self.current_states = current_states
+    def __init__(self, current_states: set, accept_states: set, rulebook):
+        self._current_states = current_states
         self.accept_states = accept_states
         self.rulebook = rulebook
 
+    @property
+    def current_states(self):
+        return self.rulebook.follow_free_moves(self._current_states)
+
     def accepting(self):
-        return any(self.current_states & set(self.accept_states))
+        return any(self.current_states & self.accept_states)
 
     def read_character(self, character):
-        self.current_states = self.rulebook.next_states(self.current_states, character)
+        self._current_states = self.rulebook.next_states(self.current_states, character)
 
-    def read_string(self, string):
+    def read_string(self, string: str):
         for i in string:
             self.read_character(i)
 
 
 class NFADesign:
-    def __init__(self, start_state, accept_states, rulebook):
+    def __init__(self, start_state, accept_states: set, rulebook):
         self.start_state = start_state
         self.accept_states = accept_states
         self.rulebook = rulebook
 
-    def accepts(self, string):
+    def accepts(self, string: str):
         nfa = self.to_nfa()
         nfa.read_string(string)
         return nfa.accepting()
 
     def to_nfa(self):
-        return NFA(set(self.start_state), self.accept_states, self.rulebook)
+        return NFA({self.start_state}, self.accept_states, self.rulebook)
 
 
 if __name__ == '__main__':
@@ -165,11 +172,11 @@ if __name__ == '__main__':
           nfa_rulebook.next_states({1, 2}, 'a'),
           nfa_rulebook.next_states({1, 3}, 'b'))
 
-    print(NFA({1}, [4], nfa_rulebook).accepting(),
-          NFA({1, 2, 4}, [4], nfa_rulebook).accepting())
+    print(NFA({1}, {4}, nfa_rulebook).accepting(),
+          NFA({1, 2, 4}, {4}, nfa_rulebook).accepting())
 
     # nfa read_character
-    nfa = NFA({1}, [4], nfa_rulebook)
+    nfa = NFA({1}, {4}, nfa_rulebook)
     print(nfa.accepting())
     nfa.read_character('b')
     nfa.read_character('a')
@@ -177,13 +184,13 @@ if __name__ == '__main__':
     print('read_character', nfa.accepting())
 
     # nfa read_string
-    nfa = NFA({1}, [4], nfa_rulebook)
+    nfa = NFA({1}, {4}, nfa_rulebook)
     print(nfa.accepting())
     nfa.read_string('bbbbb')
     print('read_string', nfa.accepting())
 
     # nfa_design
-    nfa_design = NFADesign({1}, [4], nfa_rulebook)
+    nfa_design = NFADesign(1, {4}, nfa_rulebook)
     print('nfa_design: ',
           nfa_design.accepts('bab'),
           nfa_design.accepts('bbbbb'),
@@ -198,4 +205,10 @@ if __name__ == '__main__':
     nfa_free_move_rulebook = NFARulebook(nfa_free_move_rule)
     print(nfa_free_move_rulebook.next_states({1}, None))
 
+    # free_moves
     print(nfa_free_move_rulebook.follow_free_moves({1}))
+    nfa_design = NFADesign(1, {2, 4}, nfa_free_move_rulebook)
+    print(nfa_design.accepts('aa'),
+          nfa_design.accepts('aaa'),
+          nfa_design.accepts('aaaaa'),
+          nfa_design.accepts('aaaaaa'))
