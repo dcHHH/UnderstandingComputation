@@ -1,4 +1,5 @@
 from itertools import chain
+from typing import List
 
 
 class FARule:
@@ -9,6 +10,17 @@ class FARule:
 
     def __repr__(self):
         return f"FARule {self.status} -- {self.character} -> {self.next_status}"
+
+    def __eq__(self, other):
+        if isinstance(other, FARule):
+            is_equal = (self.status == other.status
+                        and self.character == other.character
+                        and self.next_status == other.next_status)
+            return is_equal
+        return False
+
+    def __hash__(self):
+        return hash((*self.status, self.character, *self.next_status))
 
     def applies_to(self, status, character):
         return self.status == status and self.character == character
@@ -88,6 +100,10 @@ class NFARulebook:
         else:
             return self.follow_free_moves(states | move_states)
 
+    def alphabet(self):
+        return list(set([rule.character
+                         for rule in self.rules if rule.character is not None]))
+
 
 class NFA:
     def __init__(self, current_states: set, accept_states: set, rulebook):
@@ -121,8 +137,40 @@ class NFADesign:
         nfa.read_string(string)
         return nfa.accepting()
 
-    def to_nfa(self):
-        return NFA({self.start_state}, self.accept_states, self.rulebook)
+    def to_nfa(self, start_state: set = None):
+        current_states = start_state or {self.start_state}
+        return NFA(current_states, self.accept_states, self.rulebook)
+
+
+class NFASimulation:
+    def __init__(self, nfa_design):
+        self.nfa_design = nfa_design
+
+    def next_state(self, state: set, character):
+        nfa = self.nfa_design.to_nfa(state)
+        nfa.read_character(character)
+        return nfa.current_states
+
+    def rules_for(self, state):
+        return [FARule(state, character, self.next_state(state, character))
+                for character in self.nfa_design.rulebook.alphabet()]
+
+    def discover_states_and_rules(self, states: List[set]):
+        rules = list(set(chain(*[self.rules_for(state) for state in states])))
+        more_states = [rule.follow() for rule in rules if rule.follow() not in states]
+        more_states_issubset_states = all([state in states for state in more_states])
+
+        if more_states_issubset_states:
+            return states, rules
+        else:
+            return self.discover_states_and_rules(states + more_states)
+
+    def to_dfa_design(self):
+        start_state = self.nfa_design.to_nfa().current_states
+        states, rules = self.discover_states_and_rules([start_state])
+        accept_states = [state for state in states if self.nfa_design.to_nfa(state).accepting()]
+
+        return DFADesign(start_state, accept_states, DFARulebook(rules))
 
 
 if __name__ == '__main__':
@@ -212,3 +260,40 @@ if __name__ == '__main__':
           nfa_design.accepts('aaa'),
           nfa_design.accepts('aaaaa'),
           nfa_design.accepts('aaaaaa'))
+
+    # NFASimulation
+    simulation_rules = [FARule(1, 'a', 1), FARule(1, 'a', 2), FARule(1, None, 2),
+                        FARule(2, 'b', 3),
+                        FARule(3, 'b', 1), FARule(3, None, 2)]
+    simulation_rulebook = NFARulebook(simulation_rules)
+
+    simulation_nfa_design = NFADesign(1, {3}, simulation_rulebook)
+    print(simulation_nfa_design.to_nfa().current_states,
+          simulation_nfa_design.to_nfa({2}).current_states,
+          simulation_nfa_design.to_nfa({3}).current_states)
+
+    nfa = simulation_nfa_design.to_nfa({2, 3})
+    nfa.read_character('b')
+    print(nfa.current_states)
+
+    simulation = NFASimulation(simulation_nfa_design)
+    print(simulation.next_state({1, 2}, 'a'),
+          simulation.next_state({1, 2}, 'b'),
+          simulation.next_state({2, 3}, 'b'),
+          simulation.next_state({1, 2, 3}, 'b'),
+          simulation.next_state({1, 2, 3}, 'a'))
+
+    print(simulation_rulebook.alphabet())
+    print(simulation.rules_for({1, 2}))
+    print(simulation.rules_for({2, 3}))
+
+    start_state = simulation_nfa_design.to_nfa().current_states
+    print(simulation.discover_states_and_rules([start_state]))
+
+    print(simulation_nfa_design.to_nfa({1, 2}).accepting(),
+          simulation_nfa_design.to_nfa({2, 3}).accepting())
+
+    dfa_design = simulation.to_dfa_design()
+    print(dfa_design.accepts('aaa'),
+          dfa_design.accepts('aab'),
+          dfa_design.accepts('bbbabb'))
